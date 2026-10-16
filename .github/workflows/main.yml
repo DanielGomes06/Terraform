@@ -1,3 +1,4 @@
+
 name: Terraform Azure
 
 on:
@@ -18,14 +19,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar código
+      - name: Baixar codigo
         uses: actions/checkout@v4
 
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Gerar chave SSH temporaria
+        run: |
+          ssh-keygen -t ed25519 -N "" \
+            -f "$RUNNER_TEMP/terraform_lab_key"
+          echo "TF_VAR_admin_ssh_public_key=$(cat "$RUNNER_TEMP/terraform_lab_key.pub")" >> "$GITHUB_ENV"
+
       - name: Inicializar Terraform
         run: terraform init
+
+      - name: Validar configuracao
+        run: terraform validate
 
       - name: Planejar Terraform
         run: terraform plan
