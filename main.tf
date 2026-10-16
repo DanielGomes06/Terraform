@@ -1,8 +1,9 @@
+
 terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 5.0"
+      version = "~> 4.0"
     }
   }
 }
@@ -11,37 +12,48 @@ provider "azurerm" {
   features {}
 }
 
-# O Resource Group continua sendo um recurso existente no Azure.
-data "azurerm_resource_group" "lab" {
-  name = "LinuxTeste"
+# Chave publica gerada pelo GitHub Actions
+variable "admin_ssh_public_key" {
+  description = "Chave publica SSH temporaria do laboratorio"
+  type        = string
+  sensitive   = true
 }
 
 # ============================================================
-# REDE VIRTUAL E SUBNET — GERENCIADAS PELO TERRAFORM
+# RESOURCE GROUP
+# ============================================================
+
+resource "azurerm_resource_group" "lab" {
+  name     = "rg-terraform-aula"
+  location = "southafricanorth"
+}
+
+# ============================================================
+# REDE VIRTUAL E SUB-REDE
 # ============================================================
 
 resource "azurerm_virtual_network" "lab" {
-  name                = "LinuxTeste-vnet"
-  location            = data.azurerm_resource_group.lab.location
-  resource_group_name = data.azurerm_resource_group.lab.name
+  name                = "terraform-vnet"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
   address_space       = ["10.10.0.0/16"]
 }
 
 resource "azurerm_subnet" "default" {
   name                 = "default"
-  resource_group_name  = data.azurerm_resource_group.lab.name
+  resource_group_name  = azurerm_resource_group.lab.name
   virtual_network_name = azurerm_virtual_network.lab.name
   address_prefixes     = ["10.10.1.0/24"]
 }
 
 # ============================================================
-# NETWORK SECURITY GROUP
+# REGRAS DE SEGURANCA DA REDE
 # ============================================================
 
 resource "azurerm_network_security_group" "vm" {
-  name                = "LinuxTeste-TF-nsg"
-  location            = data.azurerm_resource_group.lab.location
-  resource_group_name = data.azurerm_resource_group.lab.name
+  name                = "terraform-nsg"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
 
   security_rule {
     name                       = "HTTP"
@@ -55,8 +67,6 @@ resource "azurerm_network_security_group" "vm" {
     destination_address_prefix = "*"
   }
 
-  # Mantida para administração quando a rede permitir SSH.
-  # Na Fatec, o acesso SSH pode continuar bloqueado pela rede local.
   security_rule {
     name                       = "SSH"
     priority                   = 1001
@@ -71,13 +81,13 @@ resource "azurerm_network_security_group" "vm" {
 }
 
 # ============================================================
-# IP PÚBLICO
+# IP PUBLICO
 # ============================================================
 
 resource "azurerm_public_ip" "vm" {
-  name                = "LinuxTeste-TF-ip"
-  location            = data.azurerm_resource_group.lab.location
-  resource_group_name = data.azurerm_resource_group.lab.name
+  name                = "terraform-ip"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
   allocation_method   = "Static"
   sku                 = "Standard"
 }
@@ -87,9 +97,9 @@ resource "azurerm_public_ip" "vm" {
 # ============================================================
 
 resource "azurerm_network_interface" "vm" {
-  name                = "LinuxTeste-TF-nic"
-  location            = data.azurerm_resource_group.lab.location
-  resource_group_name = data.azurerm_resource_group.lab.name
+  name                = "terraform-nic"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
 
   ip_configuration {
     name                          = "internal"
@@ -105,13 +115,13 @@ resource "azurerm_network_interface_security_group_association" "vm" {
 }
 
 # ============================================================
-# MÁQUINA VIRTUAL — DOCKER INSTALADO PELO CLOUD-INIT
+# MAQUINA VIRTUAL LINUX COM DOCKER
 # ============================================================
 
 resource "azurerm_linux_virtual_machine" "vm" {
-  name                = "LinuxTeste-TF"
-  resource_group_name = data.azurerm_resource_group.lab.name
-  location            = data.azurerm_resource_group.lab.location
+  name                = "terraform-linux-vm"
+  resource_group_name = azurerm_resource_group.lab.name
+  location            = azurerm_resource_group.lab.location
   size                = "Standard_B2ats_v2"
 
   admin_username                  = "azureuser"
@@ -123,11 +133,9 @@ resource "azurerm_linux_virtual_machine" "vm" {
 
   admin_ssh_key {
     username   = "azureuser"
-    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDC6jsBFaxcs+eUbsbFdQMRdhuGQYV5g/BD/zhkiHE/g52mV1m2KjtODC47h3J0k+k9V0bewYA5+GNrvxngD4J3rbHhIRCHjNv4DbJqGljnSALeAUj16bxjZeL2nuJjgCjbIGUwNtH5G8y31vHZDCEJtM80a5KYWuy5ziM++UQi2DHTqErzsSYVtjII+OD4tZil3sa+hM5X1CN/ol9CytXxinvGfVKttLXnjY3LZQ1GxitYOoTujnGz5sPGtr7rxdlQJsR+OLJr7G66j2VV0PeaxDYL2JN2bWwdUUQbuFLlJH+ey0598vDnfYLKhYZZIBIOkphqsL99evX9ZgQExkhaDySJFwMZEHjcdBVbrlCsL9kcp/W/v2ecupPJewh/IMK60I0wAGuOgo+kRJF+r/LA1fcRjmZ58YsLx3wCC8cQtVuEriWY2/SZY1OvRXbep+cj+33Lj9X139mIp0MyFMRJURAI4kax8xLW4Hlf6AFKkd9Fk+S0W2qNrYkTv/zxy1U= imported-openssh-key"
+    public_key = var.admin_ssh_public_key
   }
 
-  # O Azure executa este script na primeira inicialização da VM.
-  # A instalação pode continuar por alguns minutos após a VM ficar disponível.
   custom_data = base64encode(<<-CLOUDCONFIG
     #cloud-config
     package_update: true
@@ -153,8 +161,12 @@ resource "azurerm_linux_virtual_machine" "vm" {
 }
 
 # ============================================================
-# OUTPUTS
+# INFORMACOES DA INFRAESTRUTURA CRIADA
 # ============================================================
+
+output "resource_group" {
+  value = azurerm_resource_group.lab.name
+}
 
 output "nome_vm" {
   value = azurerm_linux_virtual_machine.vm.name
@@ -166,8 +178,4 @@ output "ip_publico" {
 
 output "tamanho_vm" {
   value = azurerm_linux_virtual_machine.vm.size
-}
-
-output "rede_virtual" {
-  value = azurerm_virtual_network.lab.name
 }
