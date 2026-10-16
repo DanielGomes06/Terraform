@@ -10,6 +10,8 @@ terraform {
 
 provider "azurerm" {
   features {}
+
+  resource_provider_registrations = "none"
 }
 
 # Chave publica gerada pelo GitHub Actions
