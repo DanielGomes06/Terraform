@@ -25,6 +25,9 @@ jobs:
       - name: Instalar Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Configurar chave publica SSH
+        run: |
+          echo "TF_VAR_admin_ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" >> "$GITHUB_ENV"
 
       - name: Inicializar Terraform
         run: terraform init
