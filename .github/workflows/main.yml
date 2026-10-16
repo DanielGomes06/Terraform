@@ -39,3 +39,6 @@ jobs:
 
       - name: Planejar Terraform
         run: terraform plan
+        
+      - name: Aplicar Terraform
+        run: terraform apply -auto-approve      
